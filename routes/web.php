@@ -18,7 +18,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('tasks/{id}', [\App\Http\Controllers\Trainees\TaskController::class, 'update'])->name('tasks.update');
         Route::delete('tasks/{id}', [\App\Http\Controllers\Trainees\TaskController::class, 'destroy'])->name('tasks.destroy');
 
-        Route::get('support', [\App\Http\Controllers\Trainees\SupportController::class, 'index'])->name('support');
+        Route::get('support-requests', [\App\Http\Controllers\Trainees\SupportController::class, 'index'])->name('support');
+        Route::post('support-requests', [\App\Http\Controllers\Trainees\SupportController::class, 'store'])->name('support.store');
+        Route::put('support-requests', [\App\Http\Controllers\Trainees\SupportController::class, 'update'])->name('support.update');
+        Route::delete('support-requests', [\App\Http\Controllers\Trainees\SupportController::class, 'destroy'])->name('support.destroy');
+        Route::patch('support-requests/{id}/resolve', [\App\Http\Controllers\Trainees\SupportController::class, 'resolved'])->name('support.resolve');
+
     });
 
     // Supervisor routes

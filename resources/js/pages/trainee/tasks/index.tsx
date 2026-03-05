@@ -48,6 +48,7 @@ import {
 import { useDebounce } from '@/hooks/use-debounce';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
+import Pagination from '@/components/pagination';
 
 
 interface Props {
@@ -150,29 +151,7 @@ export default function Tasks({ tasks, query = {}, total_tasks, total_hours, com
         setStatusInput(value);
     };
 
-    const handlePageChange = (page: number) => {
-        const filters: any = {};
 
-        if (statusInput !== 'all') {
-            filters.status = statusInput;
-        }
-
-        if (searchInput) {
-            filters.title = searchInput;
-        }
-
-        router.get(
-            '/trainee/tasks',
-            {
-                page,
-                filter: filters,
-            },
-            {
-                preserveState: true,
-                preserveScroll: true,
-            },
-        );
-    };
 
     const clearFilters = () => {
         setSearchInput('');
@@ -464,39 +443,14 @@ export default function Tasks({ tasks, query = {}, total_tasks, total_hours, com
                             </div>
                         )}
                     </CardContent>
-
                     {tasks.last_page > 1 && (
-                        <CardFooter className="flex items-center justify-between border-t px-6 py-4">
-                            <div className="text-sm text-muted-foreground">
-                                Page {tasks.current_page} of {tasks.last_page}
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() =>
-                                        handlePageChange(tasks.current_page - 1)
-                                    }
-                                    disabled={tasks.current_page === 1}
-                                >
-                                    <ChevronLeft className="h-4 w-4" />
-                                    Previous
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() =>
-                                        handlePageChange(tasks.current_page + 1)
-                                    }
-                                    disabled={
-                                        tasks.current_page === tasks.last_page
-                                    }
-                                >
-                                    Next
-                                    <ChevronRight className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        </CardFooter>
+                        <CardContent>
+                            <Pagination
+                                links={tasks.links}
+                                current_page={tasks.current_page}
+                                last_page={tasks.last_page}
+                            />
+                        </CardContent>
                     )}
                 </Card>
 

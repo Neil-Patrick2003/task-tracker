@@ -99,7 +99,7 @@ class TaskController extends Controller
             SupportRequest::create([
                 'subject' => $request->supportSubject,
                 'description' => $request->supportDescription,
-                'status' => 'Pending',
+                'status' => 'Submitted',
                 'task_id' => $task->id,
                 'ojt_id' => Auth::id(),
             ]);

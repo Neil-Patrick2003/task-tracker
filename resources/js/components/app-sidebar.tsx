@@ -1,17 +1,16 @@
 import { Link } from '@inertiajs/react';
-import { 
-    LayoutGrid, 
-    ClipboardList, 
-    HeadphonesIcon, 
+import {
+    LayoutGrid,
+    ClipboardList,
+    HeadphonesIcon,
     Users,
     MessageSquareMore,
     ArrowLeftRight,
-    Sun,
-    Moon
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
+import { Button } from '@/components/ui/button';
 import {
     Sidebar,
     SidebarContent,
@@ -22,10 +21,7 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { useRole } from '@/hooks/use-role';
-import { useAppearance } from '@/hooks/use-appearance';
-import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
+
 import type { NavItem } from '@/types';
 
 // Trainee/Intern navigation items
@@ -42,7 +38,7 @@ const traineeNavItems: NavItem[] = [
     },
     {
         title: 'Support',
-        href: '/trainee/support',
+        href: '/trainee/support-requests',
         icon: HeadphonesIcon,
     },
 ];
@@ -76,7 +72,7 @@ export function AppSidebar() {
     const isIntern = role === 'intern';
     const navItems = isIntern ? traineeNavItems : supervisorNavItems;
     const homeHref = isIntern ? '/trainee/dashboard' : '/supervisor/dashboard';
-    
+
     return (
         <Sidebar collapsible="icon" variant="inset">
             <SidebarHeader>
@@ -93,7 +89,7 @@ export function AppSidebar() {
 
             <SidebarContent>
                 <NavMain items={navItems} label={isIntern ? 'Intern' : 'Supervisor'} />
-                
+
                 {/* Role Switcher for Demo */}
                 <div className="px-3 py-2">
                     <Button
