@@ -12,9 +12,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Trainee/Intern routes
     Route::prefix('trainee')->name('trainee.')->group(function () {
-        Route::inertia('dashboard', 'trainee/dashboard')->name('dashboard');
-        Route::inertia('tasks', 'trainee/tasks/index')->name('tasks');
-        Route::inertia('support', 'trainee/support/index')->name('support');
+        Route::get('dashboard', [\App\Http\Controllers\Trainees\TraineesController::class, 'index'])->name('dashboard');
+        Route::get('tasks', [\App\Http\Controllers\Trainees\TaskController::class, 'index'])->name('tasks');
+        Route::post('tasks', [\App\Http\Controllers\Trainees\TaskController::class, 'store'])->name('tasks.store');
+        Route::put('tasks/{id}', [\App\Http\Controllers\Trainees\TaskController::class, 'update'])->name('tasks.update');
+        Route::delete('tasks/{id}', [\App\Http\Controllers\Trainees\TaskController::class, 'destroy'])->name('tasks.destroy');
+
+        Route::get('support', [\App\Http\Controllers\Trainees\SupportController::class, 'index'])->name('support');
     });
 
     // Supervisor routes

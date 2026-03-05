@@ -1,9 +1,9 @@
-import { Head } from '@inertiajs/react';
-import { useState } from 'react';
-import { 
-    Plus, 
-    Pencil, 
-    Trash2, 
+// pages/trainee/tasks.tsx
+import { Head, useForm, router } from '@inertiajs/react';
+import {
+    Plus,
+    Pencil,
+    Trash2,
     Search,
     Filter,
     Calendar,
@@ -11,14 +11,24 @@ import {
     AlertCircle,
     CheckCircle2,
     Loader2,
-    X
+    ChevronLeft,
+    ChevronRight,
+    X,
 } from 'lucide-react';
-import AppLayout from '@/layouts/app-layout';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useEffect } from 'react';
+import TaskForm from '@/components/tasks/TaskForm';
+import type { PaginatedData } from '@/components/types';
+import type { Task } from '@/components/types/models/Task';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardFooter,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -26,8 +36,8 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import {
     Select,
     SelectContent,
@@ -35,8 +45,27 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
+import { useDebounce } from '@/hooks/use-debounce';
+import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
+
+
+interface Props {
+    tasks:  PaginatedData<Task>;
+    query?: {
+        filter?: {
+            status?: string;
+            title?: string;
+        };
+        sort?: string;
+        page?: number;
+        perPage?: number;
+    };
+    total_tasks: number;
+    total_hours: number;
+    completed_tasks: number;
+    in_progress_tasks: number;
+}
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -49,301 +78,180 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-// Static task data
-const initialTasks = [
-    {
-        id: 1,
-        date: '2026-03-05',
-        title: 'Database Schema Design',
-        description: 'Designed and implemented the database schema for the task tracker module including users, tasks, and support requests tables.',
-        hoursRendered: 4,
-        status: 'Completed',
-        challengesEncountered: '',
-        supportNeeded: false,
-        supportDetails: '',
-        lastUpdated: '2026-03-05 14:30',
-    },
-    {
-        id: 2,
-        date: '2026-03-04',
-        title: 'API Integration for User Module',
-        description: 'Integrated REST API endpoints for user authentication and profile management.',
-        hoursRendered: 6,
-        status: 'Ongoing',
-        challengesEncountered: 'Had issues with JWT token refresh mechanism',
-        supportNeeded: true,
-        supportDetails: 'Need clarification on token expiry handling',
-        lastUpdated: '2026-03-04 17:45',
-    },
-    {
-        id: 3,
-        date: '2026-03-03',
-        title: 'Frontend Dashboard Components',
-        description: 'Built reusable React components for the analytics dashboard.',
-        hoursRendered: 5,
-        status: 'Completed',
-        challengesEncountered: '',
-        supportNeeded: false,
-        supportDetails: '',
-        lastUpdated: '2026-03-03 16:00',
-    },
-    {
-        id: 4,
-        date: '2026-03-02',
-        title: 'Unit Testing Setup',
-        description: 'Configured Jest and React Testing Library for frontend unit testing.',
-        hoursRendered: 3,
-        status: 'Completed',
-        challengesEncountered: 'Configuration issues with TypeScript paths',
-        supportNeeded: false,
-        supportDetails: '',
-        lastUpdated: '2026-03-02 15:20',
-    },
-    {
-        id: 5,
-        date: '2026-03-01',
-        title: 'Code Review and Documentation',
-        description: 'Reviewed pull requests and updated technical documentation.',
-        hoursRendered: 4,
-        status: 'Completed',
-        challengesEncountered: '',
-        supportNeeded: false,
-        supportDetails: '',
-        lastUpdated: '2026-03-01 17:00',
-    },
-];
-
 const getStatusBadge = (status: string) => {
     switch (status) {
         case 'Completed':
-            return <Badge className="bg-green-100 text-green-800 hover:bg-green-100"><CheckCircle2 className="h-3 w-3 mr-1" />Completed</Badge>;
+            return (
+                <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+                    <CheckCircle2 className="mr-1 h-3 w-3" />
+                    Completed
+                </Badge>
+            );
         case 'Ongoing':
-            return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100"><Loader2 className="h-3 w-3 mr-1" />Ongoing</Badge>;
+            return (
+                <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+                    <Loader2 className="mr-1 h-3 w-3" />
+                    Ongoing
+                </Badge>
+            );
+        case 'Pending':
+            return (
+                <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
+                    <Loader2 className="mr-1 h-3 w-3" />
+                    Pending
+                </Badge>
+            );
         default:
             return <Badge variant="secondary">{status}</Badge>;
     }
 };
 
-export default function Tasks() {
-    const [tasks, setTasks] = useState(initialTasks);
-    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+export default function Tasks({ tasks, query = {}, total_tasks, total_hours, completed_tasks, in_progress_tasks }: Props) {
+    const [isModalOpen, setIsModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [selectedTask, setSelectedTask] = useState<typeof initialTasks[0] | null>(null);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [statusFilter, setStatusFilter] = useState('all');
+    const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+    const [searchInput, setSearchInput] = useState(query.filter?.title || '');
+    const [statusInput, setStatusInput] = useState(
+        query.filter?.status || 'all',
+    );
+    const [isEditing, setIsEditing] = useState(false);
 
-    // Form state for new/edit task
-    const [formData, setFormData] = useState({
-        date: new Date().toISOString().split('T')[0],
-        title: '',
-        description: '',
-        hoursRendered: 0,
-        status: 'Ongoing',
-        challengesEncountered: '',
-        supportNeeded: false,
-        supportDetails: '',
-    });
+    const debouncedSearch = useDebounce(searchInput, 500);
 
-    const filteredTasks = tasks.filter((task) => {
-        const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            task.description.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesStatus = statusFilter === 'all' || task.status === statusFilter;
-        return matchesSearch && matchesStatus;
-    });
+    const { delete: destroy, processing } = useForm({});
 
-    const totalHours = tasks.reduce((sum, task) => sum + task.hoursRendered, 0);
-    const completedTasks = tasks.filter(t => t.status === 'Completed').length;
-    const ongoingTasks = tasks.filter(t => t.status === 'Ongoing').length;
 
-    const handleAddTask = () => {
-        const newTask = {
-            id: tasks.length + 1,
-            ...formData,
-            lastUpdated: new Date().toISOString().replace('T', ' ').slice(0, 16),
-        };
-        setTasks([newTask, ...tasks]);
-        setIsAddModalOpen(false);
-        resetForm();
+    useEffect(() => {
+        const filters: any = {};
+
+        if (statusInput !== 'all') {
+            filters.status = statusInput;
+        }
+
+        if (debouncedSearch) {
+            filters.title = debouncedSearch;
+        }
+
+        router.get(
+            '/trainee/tasks',
+            {
+                filter: filters,
+                page: 1,
+            },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            },
+        );
+    }, [debouncedSearch, statusInput]);
+
+    const handleStatusChange = (value: string) => {
+        setStatusInput(value);
     };
 
-    const handleEditTask = () => {
-        if (!selectedTask) return;
-        setTasks(tasks.map(task => 
-            task.id === selectedTask.id 
-                ? { ...task, ...formData, lastUpdated: new Date().toISOString().replace('T', ' ').slice(0, 16) }
-                : task
-        ));
-        setIsEditModalOpen(false);
+    const handlePageChange = (page: number) => {
+        const filters: any = {};
+
+        if (statusInput !== 'all') {
+            filters.status = statusInput;
+        }
+
+        if (searchInput) {
+            filters.title = searchInput;
+        }
+
+        router.get(
+            '/trainee/tasks',
+            {
+                page,
+                filter: filters,
+            },
+            {
+                preserveState: true,
+                preserveScroll: true,
+            },
+        );
+    };
+
+    const clearFilters = () => {
+        setSearchInput('');
+        setStatusInput('all');
+        router.get(
+            '/trainee/tasks',
+            {},
+            {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            },
+        );
+    };
+
+    const handleOpenModal = () => {
+        setIsEditing(false);
         setSelectedTask(null);
-        resetForm();
+        setIsModalOpen(true);
     };
 
-    const handleDeleteTask = () => {
-        if (!selectedTask) return;
-        setTasks(tasks.filter(task => task.id !== selectedTask.id));
-        setIsDeleteModalOpen(false);
-        setSelectedTask(null);
-    };
-
-    const openEditModal = (task: typeof initialTasks[0]) => {
+    const handleEditModal = (task: Task) => {
+        setIsEditing(true);
         setSelectedTask(task);
-        setFormData({
-            date: task.date,
-            title: task.title,
-            description: task.description,
-            hoursRendered: task.hoursRendered,
-            status: task.status,
-            challengesEncountered: task.challengesEncountered,
-            supportNeeded: task.supportNeeded,
-            supportDetails: task.supportDetails,
-        });
-        setIsEditModalOpen(true);
+        setIsModalOpen(true);
     };
 
-    const openDeleteModal = (task: typeof initialTasks[0]) => {
+    const handleDeleteModal = (task: Task) => {
         setSelectedTask(task);
         setIsDeleteModalOpen(true);
     };
 
-    const resetForm = () => {
-        setFormData({
-            date: new Date().toISOString().split('T')[0],
-            title: '',
-            description: '',
-            hoursRendered: 0,
-            status: 'Ongoing',
-            challengesEncountered: '',
-            supportNeeded: false,
-            supportDetails: '',
+    const handleDelete = () => {
+        if (selectedTask) {
+            destroy(`/trainee/tasks/${selectedTask.id}`, {
+                onSuccess: () => {
+                    setIsDeleteModalOpen(false);
+                    setSelectedTask(null);
+                },
+            });
+        }
+    };
+
+    const formatDate = (dateString: string) => {
+        return new Date(dateString).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
         });
     };
 
-    const TaskForm = ({ onSubmit, submitLabel }: { onSubmit: () => void; submitLabel: string }) => (
-        <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                    <Label htmlFor="date">Date</Label>
-                    <Input
-                        id="date"
-                        type="date"
-                        value={formData.date}
-                        onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                    />
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor="hours">Hours Rendered</Label>
-                    <Input
-                        id="hours"
-                        type="number"
-                        min="0"
-                        max="24"
-                        value={formData.hoursRendered}
-                        onChange={(e) => setFormData({ ...formData, hoursRendered: Number(e.target.value) })}
-                    />
-                </div>
-            </div>
-            <div className="space-y-2">
-                <Label htmlFor="title">Task Title</Label>
-                <Input
-                    id="title"
-                    placeholder="Enter task title"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                />
-            </div>
-            <div className="space-y-2">
-                <Label htmlFor="description">Task Description</Label>
-                <textarea
-                    id="description"
-                    className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    placeholder="Describe what you worked on..."
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                />
-            </div>
-            <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
-                    <SelectTrigger>
-                        <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="Ongoing">Ongoing</SelectItem>
-                        <SelectItem value="Completed">Completed</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
-            <div className="space-y-2">
-                <Label htmlFor="challenges">Challenges Encountered</Label>
-                <textarea
-                    id="challenges"
-                    className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    placeholder="Any challenges faced? (optional)"
-                    value={formData.challengesEncountered}
-                    onChange={(e) => setFormData({ ...formData, challengesEncountered: e.target.value })}
-                />
-            </div>
-            <div className="space-y-4">
-                <div className="flex items-center space-x-2">
-                    <Checkbox
-                        id="supportNeeded"
-                        checked={formData.supportNeeded}
-                        onCheckedChange={(checked) => setFormData({ ...formData, supportNeeded: checked as boolean })}
-                    />
-                    <Label htmlFor="supportNeeded" className="cursor-pointer">Support Needed</Label>
-                </div>
-                {formData.supportNeeded && (
-                    <div className="space-y-2">
-                        <Label htmlFor="supportDetails">Support Details</Label>
-                        <textarea
-                            id="supportDetails"
-                            className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                            placeholder="Describe the support you need..."
-                            value={formData.supportDetails}
-                            onChange={(e) => setFormData({ ...formData, supportDetails: e.target.value })}
-                        />
-                    </div>
-                )}
-            </div>
-            <DialogFooter>
-                <Button type="button" onClick={onSubmit}>{submitLabel}</Button>
-            </DialogFooter>
-        </div>
-    );
+    const hasActiveFilters = statusInput !== 'all' || searchInput;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
+            <TaskForm
+                open={isModalOpen}
+                onOpenChange={setIsModalOpen}
+                initialData={selectedTask}
+                isEditing={isEditing}
+            />
+
             <Head title="My Tasks" />
             <div className="flex h-full flex-1 flex-col gap-4 p-4">
-                {/* Header */}
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight">My Tasks</h1>
+                        <h1 className="text-2xl font-bold tracking-tight">
+                            My Tasks
+                        </h1>
                         <p className="text-muted-foreground">
                             Record and manage your daily OJT tasks
                         </p>
                     </div>
-                    <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-                        <DialogTrigger asChild>
-                            <Button onClick={() => { resetForm(); setIsAddModalOpen(true); }}>
-                                <Plus className="mr-2 h-4 w-4" />
-                                Add Task
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-2xl">
-                            <DialogHeader>
-                                <DialogTitle>Add New Task Entry</DialogTitle>
-                                <DialogDescription>
-                                    Record your daily task. Fill in all the required details.
-                                </DialogDescription>
-                            </DialogHeader>
-                            <TaskForm onSubmit={handleAddTask} submitLabel="Add Task" />
-                        </DialogContent>
-                    </Dialog>
+                    <Button onClick={handleOpenModal}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add new Task
+                    </Button>
                 </div>
 
-                {/* Stats Summary */}
                 <div className="grid gap-4 md:grid-cols-4">
                     <Card>
                         <CardContent className="pt-6">
@@ -352,8 +260,12 @@ export default function Tasks() {
                                     <Calendar className="h-5 w-5 text-primary" />
                                 </div>
                                 <div>
-                                    <div className="text-2xl font-bold">{tasks.length}</div>
-                                    <p className="text-xs text-muted-foreground">Total Tasks</p>
+                                    <div className="text-2xl font-bold">
+                                        {total_tasks}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">
+                                        Total Tasks
+                                    </p>
                                 </div>
                             </div>
                         </CardContent>
@@ -365,8 +277,12 @@ export default function Tasks() {
                                     <Clock className="h-5 w-5 text-blue-600" />
                                 </div>
                                 <div>
-                                    <div className="text-2xl font-bold">{totalHours}</div>
-                                    <p className="text-xs text-muted-foreground">Total Hours</p>
+                                    <div className="text-2xl font-bold">
+                                        {total_hours}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">
+                                        Total Hours
+                                    </p>
                                 </div>
                             </div>
                         </CardContent>
@@ -378,8 +294,12 @@ export default function Tasks() {
                                     <CheckCircle2 className="h-5 w-5 text-green-600" />
                                 </div>
                                 <div>
-                                    <div className="text-2xl font-bold">{completedTasks}</div>
-                                    <p className="text-xs text-muted-foreground">Completed</p>
+                                    <div className="text-2xl font-bold">
+                                        {completed_tasks}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">
+                                        Completed
+                                    </p>
                                 </div>
                             </div>
                         </CardContent>
@@ -391,90 +311,150 @@ export default function Tasks() {
                                     <Loader2 className="h-5 w-5 text-yellow-600" />
                                 </div>
                                 <div>
-                                    <div className="text-2xl font-bold">{ongoingTasks}</div>
-                                    <p className="text-xs text-muted-foreground">Ongoing</p>
+                                    <div className="text-2xl font-bold">
+                                        {in_progress_tasks}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">
+                                        In Progress
+                                    </p>
                                 </div>
                             </div>
                         </CardContent>
                     </Card>
                 </div>
 
-                {/* Filters */}
                 <div className="flex items-center gap-4">
-                    <div className="relative flex-1 max-w-sm">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <div className="relative max-w-sm flex-1">
+                        <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
-                            placeholder="Search tasks..."
+                            placeholder="Search tasks by title..."
                             className="pl-9"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
+                            value={searchInput}
+                            onChange={(e) => setSearchInput(e.target.value)}
                         />
+                        {searchInput && (
+                            <button
+                                onClick={() => setSearchInput('')}
+                                className="absolute top-1/2 right-3 -translate-y-1/2"
+                            >
+                                <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                            </button>
+                        )}
                     </div>
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <Select
+                        value={statusInput}
+                        onValueChange={handleStatusChange}
+                    >
                         <SelectTrigger className="w-[150px]">
-                            <Filter className="h-4 w-4 mr-2" />
+                            <Filter className="mr-2 h-4 w-4" />
                             <SelectValue placeholder="Status" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Status</SelectItem>
                             <SelectItem value="Completed">Completed</SelectItem>
                             <SelectItem value="Ongoing">Ongoing</SelectItem>
+                            <SelectItem value="Pending">Pending</SelectItem>
                         </SelectContent>
                     </Select>
+
+                    {hasActiveFilters && (
+                        <Button
+                            variant="ghost"
+                            onClick={clearFilters}
+                            size="sm"
+                        >
+                            Clear Filters
+                        </Button>
+                    )}
                 </div>
 
-                {/* Task List */}
                 <Card className="flex-1">
                     <CardHeader>
                         <CardTitle>Task Entries</CardTitle>
                         <CardDescription>
-                            {filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''} found
+                            Showing {tasks.from} to {tasks.to} of {tasks.total}{' '}
+                            tasks
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        {filteredTasks.length === 0 ? (
+                        {tasks.data.length === 0 ? (
                             <div className="flex h-[200px] items-center justify-center text-muted-foreground">
                                 No tasks found. Click "Add Task" to get started.
                             </div>
                         ) : (
                             <div className="space-y-4">
-                                {filteredTasks.map((task) => (
-                                    <div key={task.id} className="rounded-lg border p-4 hover:bg-accent/50 transition-colors">
+                                {tasks.data.map((task) => (
+                                    <div
+                                        key={task.id}
+                                        className="rounded-lg border p-4 transition-colors hover:bg-accent/50"
+                                    >
                                         <div className="flex items-start justify-between">
                                             <div className="flex-1">
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <h3 className="font-semibold">{task.title}</h3>
-                                                    {getStatusBadge(task.status)}
-                                                    {task.supportNeeded && (
-                                                        <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
-                                                            <AlertCircle className="h-3 w-3 mr-1" />
-                                                            Support Needed
+                                                <div className="mb-1 flex flex-wrap items-center gap-2">
+                                                    <h3 className="font-semibold">
+                                                        {task.title}
+                                                    </h3>
+                                                    {getStatusBadge(
+                                                        task.status,
+                                                    )}
+                                                    {task.requests && (
+                                                        <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">
+                                                            <AlertCircle className="mr-1 h-3 w-3" />
+                                                            Support Requested
                                                         </Badge>
                                                     )}
                                                 </div>
-                                                <p className="text-sm text-muted-foreground mb-2">{task.description}</p>
+                                                <p className="mb-2 text-sm text-muted-foreground">
+                                                    {task.description}
+                                                </p>
                                                 <div className="flex items-center gap-4 text-xs text-muted-foreground">
                                                     <span className="flex items-center gap-1">
                                                         <Calendar className="h-3 w-3" />
-                                                        {task.date}
+                                                        {formatDate(task.date)}
                                                     </span>
                                                     <span className="flex items-center gap-1">
                                                         <Clock className="h-3 w-3" />
-                                                        {task.hoursRendered} hours
+                                                        {task.hoursRendered}{' '}
+                                                        hours
                                                     </span>
-                                                    <span>Last updated: {task.lastUpdated}</span>
+                                                    <span>
+                                                        Last updated:{' '}
+                                                        {formatDate(
+                                                            task.updated_at,
+                                                        )}
+                                                    </span>
                                                 </div>
-                                                {task.challengesEncountered && (
-                                                    <div className="mt-2 p-2 bg-yellow-50 rounded text-sm text-gray-900">
-                                                        <span className="font-medium">Challenges:</span> {task.challengesEncountered}
+
+                                                {task.challenges && (
+                                                    <div className="mt-2 rounded bg-orange-100 p-2 text-sm dark:bg-white/10">
+                                                        <span className="font-medium">
+                                                            Challenges:
+                                                        </span>{' '}
+                                                        {
+                                                            task.challenges
+                                                                .description
+                                                        }
                                                     </div>
                                                 )}
                                             </div>
-                                            <div className="flex items-center gap-2 ml-4">
-                                                <Button variant="ghost" size="icon" onClick={() => openEditModal(task)}>
+                                            <div className="ml-4 flex items-center gap-2">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() =>
+                                                        handleEditModal(task)
+                                                    }
+                                                >
                                                     <Pencil className="h-4 w-4" />
                                                 </Button>
-                                                <Button variant="ghost" size="icon" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => openDeleteModal(task)}>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                                                    onClick={() =>
+                                                        handleDeleteModal(task)
+                                                    }
+                                                >
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
                                             </div>
@@ -484,33 +464,70 @@ export default function Tasks() {
                             </div>
                         )}
                     </CardContent>
+
+                    {tasks.last_page > 1 && (
+                        <CardFooter className="flex items-center justify-between border-t px-6 py-4">
+                            <div className="text-sm text-muted-foreground">
+                                Page {tasks.current_page} of {tasks.last_page}
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                        handlePageChange(tasks.current_page - 1)
+                                    }
+                                    disabled={tasks.current_page === 1}
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                    Previous
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                        handlePageChange(tasks.current_page + 1)
+                                    }
+                                    disabled={
+                                        tasks.current_page === tasks.last_page
+                                    }
+                                >
+                                    Next
+                                    <ChevronRight className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </CardFooter>
+                    )}
                 </Card>
 
-                {/* Edit Modal */}
-                <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-                    <DialogContent className="max-w-2xl">
-                        <DialogHeader>
-                            <DialogTitle>Edit Task Entry</DialogTitle>
-                            <DialogDescription>
-                                Update your task details. Changes will be auto-timestamped.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <TaskForm onSubmit={handleEditTask} submitLabel="Save Changes" />
-                    </DialogContent>
-                </Dialog>
-
-                {/* Delete Confirmation Modal */}
-                <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
+                <Dialog
+                    open={isDeleteModalOpen}
+                    onOpenChange={setIsDeleteModalOpen}
+                >
                     <DialogContent>
                         <DialogHeader>
                             <DialogTitle>Delete Task Entry</DialogTitle>
                             <DialogDescription>
-                                Are you sure you want to delete "{selectedTask?.title}"? This action cannot be undone.
+                                Are you sure you want to delete "
+                                {selectedTask?.title}"? This action cannot be
+                                undone.
                             </DialogDescription>
                         </DialogHeader>
                         <DialogFooter className="gap-2">
-                            <Button variant="outline" onClick={() => setIsDeleteModalOpen(false)}>Cancel</Button>
-                            <Button variant="destructive" onClick={handleDeleteTask}>Delete Task</Button>
+                            <Button
+                                variant="outline"
+                                onClick={() => setIsDeleteModalOpen(false)}
+                                disabled={processing}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                variant="destructive"
+                                onClick={handleDelete}
+                                disabled={processing}
+                            >
+                                {processing ? 'Deleting...' : 'Delete Task'}
+                            </Button>
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
