@@ -1,5 +1,5 @@
 import { Link, router } from '@inertiajs/react';
-import { LogOut, Settings } from 'lucide-react';
+import { LogOut, Settings, Sun, Moon } from 'lucide-react';
 import {
     DropdownMenuGroup,
     DropdownMenuItem,
@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { UserInfo } from '@/components/user-info';
 import { useMobileNavigation } from '@/hooks/use-mobile-navigation';
+import { useAppearance } from '@/hooks/use-appearance';
 import { logout } from '@/routes';
 import { edit } from '@/routes/profile';
 import type { User } from '@/types';
@@ -18,10 +19,16 @@ type Props = {
 
 export function UserMenuContent({ user }: Props) {
     const cleanup = useMobileNavigation();
+    const { appearance, updateAppearance } = useAppearance();
 
     const handleLogout = () => {
         cleanup();
         router.flushAll();
+    };
+
+    const toggleTheme = () => {
+        const newTheme = appearance === 'dark' ? 'light' : 'dark';
+        updateAppearance(newTheme);
     };
 
     return (
@@ -33,6 +40,19 @@ export function UserMenuContent({ user }: Props) {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
+                <DropdownMenuItem onClick={toggleTheme} className="cursor-pointer">
+                    {appearance === 'dark' ? (
+                        <>
+                            <Sun className="mr-2 h-4 w-4" />
+                            Light Mode
+                        </>
+                    ) : (
+                        <>
+                            <Moon className="mr-2 h-4 w-4" />
+                            Dark Mode
+                        </>
+                    )}
+                </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                     <Link
                         className="block w-full cursor-pointer"
