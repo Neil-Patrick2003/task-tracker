@@ -36,7 +36,7 @@ export default function TaskForm({
             title: '',
             description: '',
             hoursRendered: 0,
-            status: 'Ongoing',
+            status: 'In Progress',
             challengesEncountered: '',
             supportNeeded: false,
             supportSubject: '',
@@ -210,10 +210,8 @@ export default function TaskForm({
                                     handleChange('status', e.target.value)
                                 }
                             >
-                                <option value="Ongoing">Ongoing</option>
+                                <option value="In Progress">In Progress</option>
                                 <option value="Completed">Completed</option>
-                                <option value="Pending">Pending</option>
-                                <option value="Blocked">Blocked</option>
                             </select>
                         </div>
 

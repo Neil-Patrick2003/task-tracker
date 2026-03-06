@@ -1,18 +1,71 @@
+// resources/js/pages/trainee/dashboard.tsx
+
 import { Head } from '@inertiajs/react';
-import { 
-    ClipboardList, 
-    Clock, 
-    CheckCircle2, 
-    AlertCircle, 
+import {
+    ClipboardList,
+    Clock,
+    CheckCircle2,
+    AlertCircle,
     MessageSquare,
     TrendingUp,
     CalendarDays,
-    Loader2
+    Loader2,
 } from 'lucide-react';
+import { useState } from 'react';
 import AppLayout from '@/layouts/app-layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import type { BreadcrumbItem } from '@/types';
+
+interface Stats {
+    totalTasks: number;
+    totalHours: number;
+    completedTasks: number;
+    ongoingTasks: number;
+    pendingSupport: number;
+    supervisorReplies: number;
+    completionRate: number;
+}
+
+interface WeeklyActivity {
+    day: string;
+    count: number;
+}
+
+interface RecentTask {
+    id: number;
+    title: string;
+    date: string;
+    hours: number;
+    status: string;
+    hasChallenge: boolean;
+}
+
+interface RecentRequest {
+    id: number;
+    title: string;
+    status: string;
+    date: string;
+}
+
+interface Props {
+    stats: Stats;
+    weeklyActivity: WeeklyActivity[];
+    recentTasks: RecentTask[];
+    recentRequests: RecentRequest[];
+}
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -21,78 +74,20 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-// Static data for demonstration
-const stats = {
-    totalTasks: 24,
-    totalHours: 156,
-    completedTasks: 18,
-    ongoingTasks: 6,
-    pendingSupport: 2,
-    supervisorReplies: 3,
-};
-
-const recentTasks = [
-    {
-        id: 1,
-        title: 'Database Schema Design',
-        date: '2026-03-05',
-        hours: 4,
-        status: 'Completed',
-        hasChallenge: false,
-    },
-    {
-        id: 2,
-        title: 'API Integration for User Module',
-        date: '2026-03-04',
-        hours: 6,
-        status: 'Ongoing',
-        hasChallenge: true,
-    },
-    {
-        id: 3,
-        title: 'Frontend Dashboard Components',
-        date: '2026-03-03',
-        hours: 5,
-        status: 'Completed',
-        hasChallenge: false,
-    },
-    {
-        id: 4,
-        title: 'Unit Testing Setup',
-        date: '2026-03-02',
-        hours: 3,
-        status: 'Completed',
-        hasChallenge: true,
-    },
-];
-
-const supportRequests = [
-    {
-        id: 1,
-        title: 'Need help with API authentication',
-        status: 'Replied',
-        date: '2026-03-04',
-    },
-    {
-        id: 2,
-        title: 'Database connection issues',
-        status: 'Pending',
-        date: '2026-03-05',
-    },
-    {
-        id: 3,
-        title: 'Clarification on project requirements',
-        status: 'Resolved',
-        date: '2026-03-01',
-    },
-];
-
 const getStatusBadge = (status: string) => {
     switch (status) {
         case 'Completed':
-            return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Completed</Badge>;
+            return (
+                <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+                    Completed
+                </Badge>
+            );
         case 'Ongoing':
-            return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">Ongoing</Badge>;
+            return (
+                <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+                    Ongoing
+                </Badge>
+            );
         default:
             return <Badge variant="secondary">{status}</Badge>;
     }
@@ -100,25 +95,60 @@ const getStatusBadge = (status: string) => {
 
 const getSupportStatusBadge = (status: string) => {
     switch (status) {
-        case 'Pending':
-            return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">🟡 Pending</Badge>;
+        case 'Submitted':
+            return (
+                <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
+                    🟡 Submitted
+                </Badge>
+            );
         case 'Replied':
-            return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">🔵 Replied</Badge>;
+            return (
+                <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+                    🔵 Replied
+                </Badge>
+            );
         case 'Resolved':
-            return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">🟢 Resolved</Badge>;
+            return (
+                <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+                    🟢 Resolved
+                </Badge>
+            );
         default:
             return <Badge variant="secondary">{status}</Badge>;
     }
 };
 
-export default function TraineeDashboard() {
+export default function TraineeDashboard({
+    stats,
+    weeklyActivity,
+    recentTasks,
+    recentRequests,
+}: Props) {
+    const [hoveredBar, setHoveredBar] = useState<number | null>(null);
+
+    // Find max value for scaling the bars
+    const maxCount = Math.max(...weeklyActivity.map((item) => item.count), 1);
+    const scaleFactor = maxCount > 0 ? 80 / maxCount : 1; // Scale to max height of 80px
+
+    const dayNames = [
+        'Monday',
+        'Tuesday',
+        'Wednesday',
+        'Thursday',
+        'Friday',
+        'Saturday',
+        'Sunday',
+    ];
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Intern Dashboard" />
             <div className="flex h-full flex-1 flex-col gap-6 p-4">
                 {/* Welcome Section */}
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Welcome back, Intern!</h1>
+                    <h1 className="text-2xl font-bold tracking-tight">
+                        Welcome back, Intern!
+                    </h1>
                     <p className="text-muted-foreground">
                         Here's an overview of your OJT progress
                     </p>
@@ -128,11 +158,15 @@ export default function TraineeDashboard() {
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
+                            <CardTitle className="text-sm font-medium">
+                                Total Tasks
+                            </CardTitle>
                             <ClipboardList className="h-4 w-4 text-muted-foreground" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold">{stats.totalTasks}</div>
+                            <div className="text-2xl font-bold">
+                                {stats.totalTasks}
+                            </div>
                             <p className="text-xs text-muted-foreground">
                                 Tasks submitted this OJT
                             </p>
@@ -140,11 +174,15 @@ export default function TraineeDashboard() {
                     </Card>
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Total Hours</CardTitle>
+                            <CardTitle className="text-sm font-medium">
+                                Total Hours
+                            </CardTitle>
                             <Clock className="h-4 w-4 text-muted-foreground" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold">{stats.totalHours}</div>
+                            <div className="text-2xl font-bold">
+                                {stats.totalHours}
+                            </div>
                             <p className="text-xs text-muted-foreground">
                                 Hours rendered
                             </p>
@@ -152,25 +190,37 @@ export default function TraineeDashboard() {
                     </Card>
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Completed</CardTitle>
+                            <CardTitle className="text-sm font-medium">
+                                Completed
+                            </CardTitle>
                             <CheckCircle2 className="h-4 w-4 text-green-600" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold">{stats.completedTasks}</div>
+                            <div className="text-2xl font-bold">
+                                {stats.completedTasks}
+                            </div>
                             <p className="text-xs text-muted-foreground">
-                                <span className="text-green-600">{stats.ongoingTasks} ongoing</span>
+                                <span className="text-green-600">
+                                    {stats.ongoingTasks} ongoing
+                                </span>
                             </p>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Support Requests</CardTitle>
+                            <CardTitle className="text-sm font-medium">
+                                Support Requests
+                            </CardTitle>
                             <MessageSquare className="h-4 w-4 text-muted-foreground" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold">{stats.pendingSupport}</div>
+                            <div className="text-2xl font-bold">
+                                {stats.pendingSupport}
+                            </div>
                             <p className="text-xs text-muted-foreground">
-                                <span className="text-blue-600">{stats.supervisorReplies} replies</span>
+                                <span className="text-blue-600">
+                                    {stats.supervisorReplies} replies
+                                </span>
                             </p>
                         </CardContent>
                     </Card>
@@ -182,25 +232,33 @@ export default function TraineeDashboard() {
                         <CardHeader className="flex flex-row items-center justify-between">
                             <div>
                                 <CardTitle>Task Completion</CardTitle>
-                                <CardDescription>Your task completion rate</CardDescription>
+                                <CardDescription>
+                                    Your task completion rate
+                                </CardDescription>
                             </div>
                             <TrendingUp className="h-4 w-4 text-green-600" />
                         </CardHeader>
                         <CardContent>
                             <div className="flex items-center gap-4">
                                 <div className="text-4xl font-bold text-green-600">
-                                    {Math.round((stats.completedTasks / stats.totalTasks) * 100)}%
+                                    {stats.completionRate}%
                                 </div>
                                 <div className="flex-1">
                                     <div className="h-3 w-full rounded-full bg-gray-200">
-                                        <div 
-                                            className="h-3 rounded-full bg-green-600" 
-                                            style={{ width: `${(stats.completedTasks / stats.totalTasks) * 100}%` }}
+                                        <div
+                                            className="h-3 rounded-full bg-green-600"
+                                            style={{
+                                                width: `${stats.completionRate}%`,
+                                            }}
                                         />
                                     </div>
                                     <div className="mt-2 flex justify-between text-xs text-muted-foreground">
-                                        <span>{stats.completedTasks} completed</span>
-                                        <span>{stats.ongoingTasks} ongoing</span>
+                                        <span>
+                                            {stats.completedTasks} completed
+                                        </span>
+                                        <span>
+                                            {stats.ongoingTasks} ongoing
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -211,24 +269,62 @@ export default function TraineeDashboard() {
                         <CardHeader className="flex flex-row items-center justify-between">
                             <div>
                                 <CardTitle>Weekly Activity</CardTitle>
-                                <CardDescription>Tasks submitted this week</CardDescription>
+                                <CardDescription>
+                                    Tasks submitted this week
+                                </CardDescription>
                             </div>
                             <CalendarDays className="h-4 w-4 text-muted-foreground" />
                         </CardHeader>
                         <CardContent>
-                            <div className="flex items-end gap-2 h-20">
-                                {[3, 5, 2, 4, 6, 3, 1].map((count, i) => (
-                                    <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                                        <div 
-                                            className="w-full bg-primary/80 rounded-t" 
-                                            style={{ height: `${count * 12}px` }}
-                                        />
-                                        <span className="text-xs text-muted-foreground">
-                                            {['M', 'T', 'W', 'T', 'F', 'S', 'S'][i]}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
+                            <TooltipProvider>
+                                <div className="flex h-20 items-end gap-2">
+                                    {weeklyActivity.map((item, i) => (
+                                        <Tooltip key={i}>
+                                            <TooltipTrigger asChild>
+                                                <div
+                                                    className="flex flex-1 cursor-pointer flex-col items-center gap-1"
+                                                    onMouseEnter={() =>
+                                                        setHoveredBar(i)
+                                                    }
+                                                    onMouseLeave={() =>
+                                                        setHoveredBar(null)
+                                                    }
+                                                >
+                                                    <div
+                                                        className="w-full rounded-t bg-primary/80 transition-all hover:bg-primary"
+                                                        style={{
+                                                            height: `${Math.max(item.count * scaleFactor, 4)}px`,
+                                                            opacity:
+                                                                hoveredBar === i
+                                                                    ? 1
+                                                                    : 0.8,
+                                                        }}
+                                                    />
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {item.day}
+                                                    </span>
+                                                </div>
+                                            </TooltipTrigger>
+                                            <TooltipContent
+                                                side="top"
+                                                className="border bg-white shadow-lg dark:bg-gray-800"
+                                            >
+                                                <div className="text-sm">
+                                                    <p className="font-medium">
+                                                        {dayNames[i]}
+                                                    </p>
+                                                    <p className="text-muted-foreground">
+                                                        {item.count} task
+                                                        {item.count !== 1
+                                                            ? 's'
+                                                            : ''}
+                                                    </p>
+                                                </div>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    ))}
+                                </div>
+                            </TooltipProvider>
                         </CardContent>
                     </Card>
                 </div>
@@ -239,17 +335,37 @@ export default function TraineeDashboard() {
                     <Card>
                         <CardHeader>
                             <CardTitle>Recent Tasks</CardTitle>
-                            <CardDescription>Your latest task entries</CardDescription>
+                            <CardDescription>
+                                Your latest task entries
+                            </CardDescription>
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-4">
                                 {recentTasks.map((task) => (
-                                    <div key={task.id} className="flex items-center justify-between border-b pb-3 last:border-0">
+                                    <div
+                                        key={task.id}
+                                        className="flex items-center justify-between border-b pb-3 last:border-0"
+                                    >
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2">
-                                                <span className="font-medium">{task.title}</span>
+                                                <span className="font-medium">
+                                                    {task.title}
+                                                </span>
                                                 {task.hasChallenge && (
-                                                    <AlertCircle className="h-4 w-4 text-yellow-500" />
+                                                    <TooltipProvider>
+                                                        <Tooltip>
+                                                            <TooltipTrigger>
+                                                                <AlertCircle className="h-4 w-4 text-yellow-500" />
+                                                            </TooltipTrigger>
+                                                            <TooltipContent>
+                                                                <p>
+                                                                    Has
+                                                                    challenge
+                                                                    encountered
+                                                                </p>
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    </TooltipProvider>
                                                 )}
                                             </div>
                                             <div className="text-sm text-muted-foreground">
@@ -267,14 +383,21 @@ export default function TraineeDashboard() {
                     <Card>
                         <CardHeader>
                             <CardTitle>Support Requests</CardTitle>
-                            <CardDescription>Status of your support requests</CardDescription>
+                            <CardDescription>
+                                Status of your support requests
+                            </CardDescription>
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-4">
-                                {supportRequests.map((request) => (
-                                    <div key={request.id} className="flex items-center justify-between border-b pb-3 last:border-0">
+                                {recentRequests.map((request) => (
+                                    <div
+                                        key={request.id}
+                                        className="flex items-center justify-between border-b pb-3 last:border-0"
+                                    >
                                         <div className="flex-1">
-                                            <div className="font-medium">{request.title}</div>
+                                            <div className="font-medium">
+                                                {request.title}
+                                            </div>
                                             <div className="text-sm text-muted-foreground">
                                                 {request.date}
                                             </div>
