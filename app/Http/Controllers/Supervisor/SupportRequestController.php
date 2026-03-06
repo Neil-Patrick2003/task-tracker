@@ -21,7 +21,7 @@ class SupportRequestController extends Controller
         $replied_request = SupportRequest::where('status', 'Replied')->count();
         $resolved_request = SupportRequest::where('status', 'Resolved')->count();
 
-        $trainees = User::where('role', 'trainee')->get();
+        $trainees = User::where('role', 'Intern')->get();
 
         $requests = QueryBuilder::for(SupportRequest::class)
             ->with(['user', 'task', 'response'])
