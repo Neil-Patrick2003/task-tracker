@@ -493,21 +493,33 @@ export default function Support({
                                                 </Button>
                                             </div>
                                         </div>
-
                                         {expandedId === request.id && (
                                             <div className="border-t bg-accent/30 p-4">
                                                 <div className="space-y-4">
-                                                    {request.status !==
-                                                        'Resolved' && (
+                                                    <div>
+                                                        {request?.response?.message ? (
+                                                            <div className="space-y-1">
+                                                                <p className="text-sm  p-6 border rounded-bl-2xl rounded-tr-2xl">
+                                                                    {request.response.message}
+                                                                </p>
+                                                                <p className="text-xs text-gray-500">
+                                                                    Replied at:{" "}
+                                                                    {new Date(request.response.created_at).toLocaleString()}
+                                                                </p>
+                                                            </div>
+                                                        ) : (
+                                                            <p className="text-sm text-gray-500 italic">
+                                                                No reply yet
+                                                            </p>
+                                                        )}
+                                                    </div>
+
+                                                    {request.status !== "Resolved" && (
                                                         <div className="flex justify-end">
                                                             <Button
                                                                 variant="secondary"
                                                                 className="cursor-pointer bg-green-600 text-white hover:bg-green-700"
-                                                                onClick={() =>
-                                                                    handleMarkAsResolve(
-                                                                        request,
-                                                                    )
-                                                                }
+                                                                onClick={() => handleMarkAsResolve(request)}
                                                             >
                                                                 <CheckCircle2 className="mr-2 h-4 w-4" />
                                                                 Mark as Resolved

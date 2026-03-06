@@ -37,7 +37,7 @@ class SupportController extends Controller
 
 
         $requests = QueryBuilder::for(SupportRequest::class)
-            ->with('task')
+            ->with('task', 'response')
             ->where('ojt_id', Auth::id())
             ->orderBy('created_at', 'desc')
             ->allowedFilters([
@@ -50,6 +50,8 @@ class SupportController extends Controller
             ])
             ->paginate(20)
             ->withQueryString();
+
+
 
 
         return Inertia::render('trainee/support/index', [
