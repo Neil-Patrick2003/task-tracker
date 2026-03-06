@@ -1,4 +1,4 @@
-export interface SupprtResponse{
+export interface Response {
     id: number;
     message: string;
     support_request_id: number;

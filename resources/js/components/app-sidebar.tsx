@@ -57,7 +57,7 @@ const supervisorNavItems: NavItem[] = [
     },
     {
         title: 'Support Requests',
-        href: '/supervisor/support',
+        href: '/supervisor/support-requests',
         icon: MessageSquareMore,
     },
     {
