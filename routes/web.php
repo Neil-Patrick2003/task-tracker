@@ -13,7 +13,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::inertia('dashboard', 'dashboard')->name('dashboard');
 
     // Trainee/Intern routes
-    Route::prefix('trainee')->name('trainee.')->group(function () {
+    Route::middleware(['auth', 'verified', 'role:Intern'])->prefix('trainee')->name('trainee.')->group(function () {
         Route::get('dashboard', [\App\Http\Controllers\Trainees\TraineesController::class, 'index'])->name('dashboard');
         Route::get('tasks', [\App\Http\Controllers\Trainees\TaskController::class, 'index'])->name('tasks');
         Route::post('tasks', [\App\Http\Controllers\Trainees\TaskController::class, 'store'])->name('tasks.store');
@@ -27,15 +27,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     // Supervisor routes
-    Route::prefix('supervisor')->name('supervisor.')->group(function () {
-        Route::get('dashboard', [\App\Http\Controllers\Supervisor\SupervisorController::class, 'index'])->name('supervisor.dashboard');
-        Route::get('tasks', [\App\Http\Controllers\Supervisor\TaskController::class, 'index'])->name('supervisor.tasks');
-        Route::get('support-requests', [\App\Http\Controllers\Supervisor\SupportRequestController::class, 'index'])->name('supervisor.support');
-        Route::post('support-requests/{id}/reply', [SupportRequestController::class, 'reply'])->name('supervisor.support-requests.reply');
-        Route::post('support-requests/{id}/resolve', [SupportRequestController::class, 'resolve'])->name('supervisor.support-requests.resolve');
+    Route::middleware(['auth', 'verified', 'role:Supervisor'])->prefix('supervisor')->name('supervisor.')->group(function () {
+        Route::get('dashboard', [\App\Http\Controllers\Supervisor\SupervisorController::class, 'index'])->name('dashboard');
+        Route::get('tasks', [\App\Http\Controllers\Supervisor\TaskController::class, 'index'])->name('tasks');
+        Route::get('support-requests', [\App\Http\Controllers\Supervisor\SupportRequestController::class, 'index'])->name('support');
+        Route::post('support-requests/{id}/reply', [SupportRequestController::class, 'reply'])->name('support-requests.reply');
+        Route::post('support-requests/{id}/resolve', [SupportRequestController::class, 'resolve'])->name('support-requests.resolve');
         Route::get('interns', [\App\Http\Controllers\Supervisor\TraineeController::class, 'index'])->name('interns');
         Route::post('interns', [\App\Http\Controllers\Supervisor\TraineeController::class, 'store'])->name('interns.store');
-        Route::put('/interns/{id}', [TraineeController::class, 'update'])->name('supervisor.interns.update');
+        Route::put('/interns/{id}', [TraineeController::class, 'update'])->name('.interns.update');
         Route::delete('/interns/{id}', [TraineeController::class, 'destroy'])->name('supervisor.interns.destroy');
 
     });

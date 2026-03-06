@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import {
     LayoutGrid,
     ClipboardList,
@@ -20,58 +20,102 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { useRole } from '@/hooks/use-role';
-
 import type { NavItem } from '@/types';
 
-// Trainee/Intern navigation items
-const traineeNavItems: NavItem[] = [
-    {
-        title: 'Dashboard',
-        href: '/trainee/dashboard',
-        icon: LayoutGrid,
-    },
-    {
-        title: 'My Tasks',
-        href: '/trainee/tasks',
-        icon: ClipboardList,
-    },
-    {
-        title: 'Support',
-        href: '/trainee/support-requests',
-        icon: HeadphonesIcon,
-    },
-];
-
-// Supervisor navigation items
-const supervisorNavItems: NavItem[] = [
-    {
-        title: 'Dashboard',
-        href: '/supervisor/dashboard',
-        icon: LayoutGrid,
-    },
-    {
-        title: 'Task Monitoring',
-        href: '/supervisor/tasks',
-        icon: ClipboardList,
-    },
-    {
-        title: 'Support Requests',
-        href: '/supervisor/support-requests',
-        icon: MessageSquareMore,
-    },
-    {
-        title: 'Interns',
-        href: '/supervisor/interns',
-        icon: Users,
-    },
-];
+// Navigation items for different roles
+const navigationConfig = {
+    intern: [
+        {
+            title: 'Dashboard',
+            href: '/trainee/dashboard',
+            icon: LayoutGrid,
+        },
+        {
+            title: 'My Tasks',
+            href: '/trainee/tasks',
+            icon: ClipboardList,
+        },
+        {
+            title: 'Support',
+            href: '/trainee/support-requests',
+            icon: HeadphonesIcon,
+        },
+    ],
+    trainee: [
+        // Alias for intern
+        {
+            title: 'Dashboard',
+            href: '/trainee/dashboard',
+            icon: LayoutGrid,
+        },
+        {
+            title: 'My Tasks',
+            href: '/trainee/tasks',
+            icon: ClipboardList,
+        },
+        {
+            title: 'Support',
+            href: '/trainee/support-requests',
+            icon: HeadphonesIcon,
+        },
+    ],
+    supervisor: [
+        {
+            title: 'Dashboard',
+            href: '/supervisor/dashboard',
+            icon: LayoutGrid,
+        },
+        {
+            title: 'Task Monitoring',
+            href: '/supervisor/tasks',
+            icon: ClipboardList,
+        },
+        {
+            title: 'Support Requests',
+            href: '/supervisor/support-requests',
+            icon: MessageSquareMore,
+        },
+        {
+            title: 'Interns',
+            href: '/supervisor/interns',
+            icon: Users,
+        },
+    ],
+};
 
 export function AppSidebar() {
-    const { role, toggleRole } = useRole();
-    const isIntern = role === 'intern';
-    const navItems = isIntern ? traineeNavItems : supervisorNavItems;
-    const homeHref = isIntern ? '/trainee/dashboard' : '/supervisor/dashboard';
+    const { auth } = usePage().props as any;
+    const userRole = auth?.user?.role?.toLowerCase() || '';
+
+    // Get nav items for the user's role, fallback to empty array
+    const navItems =
+        navigationConfig[userRole as keyof typeof navigationConfig] || [];
+
+    // Determine home href based on role
+    const getHomeHref = () => {
+        switch (userRole) {
+            case 'intern':
+            case 'trainee':
+                return '/trainee/dashboard';
+            case 'supervisor':
+                return '/supervisor/dashboard';
+            default:
+                return '/';
+        }
+    };
+
+    // Get display label based on role
+    const getMenuLabel = () => {
+        switch (userRole) {
+            case 'intern':
+            case 'trainee':
+                return 'Intern Menu';
+            case 'supervisor':
+                return 'Supervisor Menu';
+            default:
+                return 'Menu';
+        }
+    };
 
     return (
         <Sidebar collapsible="icon" variant="inset">
@@ -79,7 +123,7 @@ export function AppSidebar() {
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" asChild>
-                            <Link href={homeHref} prefetch>
+                            <Link href={getHomeHref()} prefetch>
                                 <AppLogo />
                             </Link>
                         </SidebarMenuButton>
@@ -88,20 +132,13 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
-                <NavMain items={navItems} label={isIntern ? 'Intern' : 'Supervisor'} />
-
-                {/* Role Switcher for Demo */}
-                <div className="px-3 py-2">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full justify-start gap-2"
-                        onClick={toggleRole}
-                    >
-                        <ArrowLeftRight className="h-4 w-4" />
-                        <span className="text-xs">Switch to {isIntern ? 'Supervisor' : 'Intern'}</span>
-                    </Button>
-                </div>
+                {navItems.length > 0 ? (
+                    <NavMain items={navItems} label={getMenuLabel()} />
+                ) : (
+                    <div className="px-3 py-2 text-sm text-muted-foreground">
+                        No navigation items available
+                    </div>
+                )}
             </SidebarContent>
 
             <SidebarFooter>
