@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Task extends Model
 {
@@ -19,9 +20,9 @@ class Task extends Model
         return $this->hasOne(Challenge::class);
     }
 
-    public function requests()
+    public function requests() : HasOne
     {
-        return $this->hasOne(SupportRequest::Class);
+        return $this->hasOne(SupportRequest::class, 'task_id');
     }
 
 

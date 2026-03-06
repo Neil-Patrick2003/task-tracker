@@ -44,7 +44,8 @@ class TaskController extends Controller
                 'date',
                 'status',
             ])
-            ->paginate(20);
+            ->paginate(20)
+        ->withQueryString();
 
 
         return Inertia::render('trainee/tasks/index', [

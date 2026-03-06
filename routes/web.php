@@ -28,8 +28,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Supervisor routes
     Route::prefix('supervisor')->name('supervisor.')->group(function () {
-        Route::inertia('dashboard', 'supervisor/dashboard')->name('dashboard');
-        Route::inertia('tasks', 'supervisor/tasks/index')->name('tasks');
+        Route::get('dashboard', [\App\Http\Controllers\Supervisor\SupervisorController::class, 'index'])->name('supervisor.dashboard');
+        Route::get('tasks', [\App\Http\Controllers\Supervisor\TaskController::class, 'index'])->name('supervisor.tasks');
         Route::inertia('support', 'supervisor/support/index')->name('support');
         Route::inertia('interns', 'supervisor/interns/index')->name('interns');
     });
