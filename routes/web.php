@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Supervisor\SupportRequestController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 
@@ -17,20 +18,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('tasks', [\App\Http\Controllers\Trainees\TaskController::class, 'store'])->name('tasks.store');
         Route::put('tasks/{id}', [\App\Http\Controllers\Trainees\TaskController::class, 'update'])->name('tasks.update');
         Route::delete('tasks/{id}', [\App\Http\Controllers\Trainees\TaskController::class, 'destroy'])->name('tasks.destroy');
-
         Route::get('support-requests', [\App\Http\Controllers\Trainees\SupportController::class, 'index'])->name('support');
         Route::post('support-requests', [\App\Http\Controllers\Trainees\SupportController::class, 'store'])->name('support.store');
         Route::put('support-requests', [\App\Http\Controllers\Trainees\SupportController::class, 'update'])->name('support.update');
         Route::delete('support-requests', [\App\Http\Controllers\Trainees\SupportController::class, 'destroy'])->name('support.destroy');
         Route::patch('support-requests/{id}/resolve', [\App\Http\Controllers\Trainees\SupportController::class, 'resolved'])->name('support.resolve');
-
     });
 
     // Supervisor routes
     Route::prefix('supervisor')->name('supervisor.')->group(function () {
         Route::get('dashboard', [\App\Http\Controllers\Supervisor\SupervisorController::class, 'index'])->name('supervisor.dashboard');
         Route::get('tasks', [\App\Http\Controllers\Supervisor\TaskController::class, 'index'])->name('supervisor.tasks');
-        Route::inertia('support', 'supervisor/support/index')->name('support');
+        Route::get('support-requests', [\App\Http\Controllers\Supervisor\SupportRequestController::class, 'index'])->name('supervisor.support');
+        Route::post('support-requests/{id}/reply', [SupportRequestController::class, 'reply'])->name('supervisor.support-requests.reply');
+        Route::post('support-requests/{id}/resolve', [SupportRequestController::class, 'resolve'])->name('supervisor.support-requests.resolve');
         Route::inertia('interns', 'supervisor/interns/index')->name('interns');
     });
 });

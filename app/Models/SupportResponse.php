@@ -11,11 +11,11 @@ class SupportResponse extends Model
 
     public function request(): BelongsTo
     {
-        return $this->belongsTo(SUpportRequest::class);
+        return $this->belongsTo(SupportRequest::class, 'support_request_id');
     }
 
     public function supervisor(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'supervisor_id');
     }
 }

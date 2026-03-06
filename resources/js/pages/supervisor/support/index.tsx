@@ -1,6 +1,5 @@
-import { Head } from '@inertiajs/react';
-import { useState } from 'react';
-import { 
+import { Head, router, useForm } from '@inertiajs/react';
+import {
     Search,
     Filter,
     MessageSquare,
@@ -10,30 +9,67 @@ import {
     Send,
     ChevronDown,
     ChevronUp,
-    AlertCircle
+    AlertCircle,
+    X,
 } from 'lucide-react';
-import AppLayout from '@/layouts/app-layout';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useEffect } from 'react';
+import Select from 'react-select';
+import PaginationPrevNext from '@/components/pagination';
+import type { PaginatedData } from '@/components/types';
+import type { Request } from '@/components/types/models/SupportRequest';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+    CardFooter,
+} from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import {
-    Select,
+    Select as ShadcnSelect,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
+
+interface Trainee {
+    id: number;
+    name: string;
+}
+
+interface Props {
+    requests: PaginatedData<Request>;
+    trainees: Trainee[];
+    query?: {
+        filter?: {
+            status?: string;
+            subject?: string;
+            trainee_name?: string;
+        };
+        sort?: string;
+        page?: number;
+        perPage?: number;
+    };
+    all_requests: number;
+    submitted_requests: number;
+    replied_requests: number;
+    resolved_requests: number;
+}
+
+interface TraineeOption {
+    value: string;
+    label: string;
+}
+
+interface ReplyFormData {
+    reply: string;
+}
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -46,136 +82,246 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-// Static support request data
-const initialRequests = [
-    {
-        id: 1,
-        intern: 'John Doe',
-        title: 'Need help with API authentication',
-        description: 'I am having trouble understanding how to implement JWT token refresh. The tokens keep expiring and users get logged out unexpectedly.',
-        relatedTask: 'API Integration for User Module',
-        status: 'Pending',
-        dateSubmitted: '2026-03-05',
-        supervisorReply: '',
-        replyDate: '',
-    },
-    {
-        id: 2,
-        intern: 'Mike Johnson',
-        title: 'Database connection issues',
-        description: 'The database connection keeps timing out when running complex queries. I\'ve tried increasing the timeout but it doesn\'t seem to help.',
-        relatedTask: 'Database Optimization',
-        status: 'Pending',
-        dateSubmitted: '2026-03-04',
-        supervisorReply: '',
-        replyDate: '',
-    },
-    {
-        id: 3,
-        intern: 'Sarah Williams',
-        title: 'Clarification on project requirements',
-        description: 'I need clarification on the user role permissions. Should interns be able to see other interns\' tasks or only their own?',
-        relatedTask: 'Frontend Dashboard',
-        status: 'Pending',
-        dateSubmitted: '2026-03-03',
-        supervisorReply: '',
-        replyDate: '',
-    },
-    {
-        id: 4,
-        intern: 'Jane Smith',
-        title: 'Testing framework configuration',
-        description: 'Having issues setting up the testing framework with TypeScript paths. The imports don\'t resolve correctly in test files.',
-        relatedTask: 'Unit Testing Setup',
-        status: 'Replied',
-        dateSubmitted: '2026-02-28',
-        supervisorReply: 'You need to update jest.config.js with moduleNameMapper to match your tsconfig paths. Check the documentation for the exact syntax.',
-        replyDate: '2026-03-01',
-    },
-    {
-        id: 5,
-        intern: 'Chris Brown',
-        title: 'Git workflow questions',
-        description: 'What\'s the preferred branching strategy for this project? Should I create feature branches from develop or main?',
-        relatedTask: 'Code Review',
-        status: 'Resolved',
-        dateSubmitted: '2026-02-25',
-        supervisorReply: 'We use GitFlow. Create feature branches from develop. Name them feature/your-feature-name. Always create a PR for code review before merging.',
-        replyDate: '2026-02-26',
-    },
-];
-
-const interns = ['John Doe', 'Jane Smith', 'Mike Johnson', 'Sarah Williams', 'Chris Brown'];
-
 const getSupportStatusBadge = (status: string) => {
     switch (status) {
-        case 'Pending':
-            return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">🟡 Pending</Badge>;
+        case 'Submitted':
+            return (
+                <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
+                    🟡 Submitted
+                </Badge>
+            );
         case 'Replied':
-            return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">🔵 Replied</Badge>;
+            return (
+                <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+                    🔵 Replied
+                </Badge>
+            );
         case 'Resolved':
-            return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">🟢 Resolved</Badge>;
+            return (
+                <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+                    🟢 Resolved
+                </Badge>
+            );
         default:
             return <Badge variant="secondary">{status}</Badge>;
     }
 };
 
-export default function SupervisorSupport() {
-    const [requests, setRequests] = useState(initialRequests);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [internFilter, setInternFilter] = useState('all');
-    const [statusFilter, setStatusFilter] = useState('all');
+const getSelectStyles = (isDark: boolean) => ({
+    control: (base: any, state: any) => ({
+        ...base,
+        backgroundColor: isDark ? '#1f2937' : 'white',
+        borderColor: state.isFocused
+            ? (isDark ? '#3b82f6' : '#3b82f6')
+            : (isDark ? '#374151' : '#e5e7eb'),
+        width: '180px',
+        '&:hover': {
+            borderColor: isDark ? '#4b5563' : '#d1d5db',
+        },
+    }),
+    menu: (base: any) => ({
+        ...base,
+        backgroundColor: isDark ? '#1f2937' : 'white',
+    }),
+    option: (base: any, state: any) => ({
+        ...base,
+        backgroundColor: state.isSelected
+            ? (isDark ? '#3b82f6' : '#3b82f6')
+            : state.isFocused
+                ? (isDark ? '#374151' : '#f3f4f6')
+                : 'transparent',
+        color: state.isSelected
+            ? 'white'
+            : (isDark ? '#f3f4f6' : '#111827'),
+    }),
+    singleValue: (base: any) => ({
+        ...base,
+        color: isDark ? '#f3f4f6' : '#111827',
+    }),
+    input: (base: any) => ({
+        ...base,
+        color: isDark ? '#f3f4f6' : '#111827',
+    }),
+    placeholder: (base: any) => ({
+        ...base,
+        color: isDark ? '#9ca3af' : '#6b7280',
+    }),
+    dropdownIndicator: (base: any) => ({
+        ...base,
+        color: isDark ? '#9ca3af' : '#6b7280',
+    }),
+    clearIndicator: (base: any) => ({
+        ...base,
+        color: isDark ? '#9ca3af' : '#6b7280',
+        '&:hover': {
+            color: isDark ? '#ef4444' : '#dc2626',
+        },
+    }),
+});
+
+export default function SupervisorSupport({
+                                              requests,
+                                              trainees,
+                                              query,
+                                              all_requests,
+                                              submitted_requests,
+                                              replied_requests,
+                                              resolved_requests,
+                                          }: Props) {
     const [expandedId, setExpandedId] = useState<number | null>(null);
-    const [isReplyModalOpen, setIsReplyModalOpen] = useState(false);
-    const [selectedRequest, setSelectedRequest] = useState<typeof initialRequests[0] | null>(null);
-    const [replyText, setReplyText] = useState('');
+    const [searchQuery, setSearchQuery] = useState(
+        query?.filter?.subject || '',
+    );
+    const [internFilter, setInternFilter] = useState<TraineeOption | null>(
+        query?.filter?.trainee_name
+            ? {
+                value: query.filter.trainee_name,
+                label: query.filter.trainee_name,
+            }
+            : null,
+    );
+    const [statusFilter, setStatusFilter] = useState(
+        query?.filter?.status || 'all',
+    );
+    const [activeRequestId, setActiveRequestId] = useState<number | null>(null);
+    const [isDarkMode, setIsDarkMode] = useState(
+        document.documentElement.classList.contains('dark'),
+    );
 
-    const pendingCount = requests.filter(r => r.status === 'Pending').length;
-    const repliedCount = requests.filter(r => r.status === 'Replied').length;
-    const resolvedCount = requests.filter(r => r.status === 'Resolved').length;
+    useEffect(() => {
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.attributeName === 'class') {
+                    setIsDarkMode(
+                        document.documentElement.classList.contains('dark'),
+                    );
+                }
+            });
+        });
 
-    const filteredRequests = requests.filter((request) => {
-        const matchesSearch = request.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            request.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            request.intern.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesIntern = internFilter === 'all' || request.intern === internFilter;
-        const matchesStatus = statusFilter === 'all' || request.status === statusFilter;
-        return matchesSearch && matchesIntern && matchesStatus;
+        observer.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ['class'],
+        });
+
+        return () => observer.disconnect();
+    }, []);
+
+    const replyForm = useForm<ReplyFormData>({
+        reply: '',
     });
 
+    const resolveForm = useForm({});
+
+    const traineeOptions: TraineeOption[] = trainees.map((trainee) => ({
+        value: trainee.name,
+        label: trainee.name,
+    }));
+
+    const handleStatusFilter = (value: string) => {
+        setStatusFilter(value);
+        router.get(
+            '/supervisor/support-requests',
+            {
+                filter: {
+                    status: value !== 'all' ? value : undefined,
+                    subject: searchQuery || undefined,
+                    trainee_name: internFilter?.value || undefined,
+                },
+            },
+            { preserveState: true, replace: true },
+        );
+    };
+
+    const handleInternFilter = (option: TraineeOption | null) => {
+        setInternFilter(option);
+        router.get(
+            '/supervisor/support-requests',
+            {
+                filter: {
+                    trainee_name: option?.value || undefined,
+                    status: statusFilter !== 'all' ? statusFilter : undefined,
+                    subject: searchQuery || undefined,
+                },
+            },
+            { preserveState: true, replace: true },
+        );
+    };
+
+    const handleSearch = (value: string) => {
+        setSearchQuery(value);
+        router.get(
+            '/supervisor/support-requests',
+            {
+                filter: {
+                    subject: value || undefined,
+                    status: statusFilter !== 'all' ? statusFilter : undefined,
+                    trainee_name: internFilter?.value || undefined,
+                },
+            },
+            { preserveState: true, replace: true },
+        );
+    };
+
     const toggleExpand = (id: number) => {
-        setExpandedId(expandedId === id ? null : id);
+        if (expandedId === id) {
+            setExpandedId(null);
+            setActiveRequestId(null);
+            replyForm.reset();
+        } else {
+            setExpandedId(id);
+            setActiveRequestId(id);
+            replyForm.setData('reply', '');
+        }
     };
 
-    const openReplyModal = (request: typeof initialRequests[0]) => {
-        setSelectedRequest(request);
-        setReplyText(request.supervisorReply || '');
-        setIsReplyModalOpen(true);
+    const handleSendReply = (requestId: number) => {
+        replyForm.post(`/supervisor/support-requests/${requestId}/reply`, {
+            onSuccess: () => {
+                replyForm.reset();
+                setExpandedId(null);
+                setActiveRequestId(null);
+            },
+        });
     };
 
-    const handleSendReply = () => {
-        if (!selectedRequest || !replyText.trim()) return;
-        
-        setRequests(requests.map(r => 
-            r.id === selectedRequest.id 
-                ? { 
-                    ...r, 
-                    supervisorReply: replyText, 
-                    replyDate: new Date().toISOString().split('T')[0],
-                    status: 'Replied'
-                } 
-                : r
-        ));
-        setIsReplyModalOpen(false);
-        setSelectedRequest(null);
-        setReplyText('');
+    const handleMarkAsResolved = (requestId: number) => {
+        resolveForm.post(`/supervisor/support-requests/${requestId}/resolve`, {
+            onSuccess: () => {
+                setExpandedId(null);
+                setActiveRequestId(null);
+            },
+        });
     };
 
-    const markAsResolved = (id: number) => {
-        setRequests(requests.map(r => 
-            r.id === id ? { ...r, status: 'Resolved' } : r
-        ));
+    const handlePageChange = (page: number) => {
+        router.get(
+            '/supervisor/support-requests',
+            {
+                page,
+                filter: {
+                    status: statusFilter !== 'all' ? statusFilter : undefined,
+                    subject: searchQuery || undefined,
+                    trainee_name: internFilter?.value || undefined,
+                },
+            },
+            { preserveState: true },
+        );
     };
+
+    const clearFilters = () => {
+        setSearchQuery('');
+        setInternFilter(null);
+        setStatusFilter('all');
+        router.get(
+            '/supervisor/support-requests',
+            {},
+            { preserveState: true, replace: true },
+        );
+    };
+
+    const hasActiveFilters =
+        searchQuery || internFilter || statusFilter !== 'all';
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -183,21 +329,44 @@ export default function SupervisorSupport() {
             <div className="flex h-full flex-1 flex-col gap-4 p-4">
                 {/* Header */}
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Support Requests</h1>
+                    <h1 className="text-2xl font-bold tracking-tight">
+                        Support Requests
+                    </h1>
                     <p className="text-muted-foreground">
                         View and respond to intern support requests
                     </p>
                 </div>
 
                 {/* Stats */}
-                <div className="grid gap-4 md:grid-cols-3">
+                <div className="grid gap-4 md:grid-cols-4">
+
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Pending</CardTitle>
+                            <CardTitle className="text-sm font-medium">
+                                All Requests
+                            </CardTitle>
+                            <MessageSquare className="h-4 w-4 text-gray-500" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold text-gray-600">
+                                {all_requests}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                                Total support requests
+                            </p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">
+                                Submitted
+                            </CardTitle>
                             <Clock className="h-4 w-4 text-yellow-500" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold text-yellow-600">{pendingCount}</div>
+                            <div className="text-2xl font-bold text-yellow-600">
+                                {submitted_requests}
+                            </div>
                             <p className="text-xs text-muted-foreground">
                                 Awaiting your response
                             </p>
@@ -205,11 +374,15 @@ export default function SupervisorSupport() {
                     </Card>
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Replied</CardTitle>
+                            <CardTitle className="text-sm font-medium">
+                                Replied
+                            </CardTitle>
                             <MessageSquare className="h-4 w-4 text-blue-500" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold text-blue-600">{repliedCount}</div>
+                            <div className="text-2xl font-bold text-blue-600">
+                                {replied_requests}
+                            </div>
                             <p className="text-xs text-muted-foreground">
                                 Response sent
                             </p>
@@ -217,11 +390,15 @@ export default function SupervisorSupport() {
                     </Card>
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Resolved</CardTitle>
+                            <CardTitle className="text-sm font-medium">
+                                Resolved
+                            </CardTitle>
                             <CheckCircle2 className="h-4 w-4 text-green-500" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold text-green-600">{resolvedCount}</div>
+                            <div className="text-2xl font-bold text-green-600">
+                                {resolved_requests}
+                            </div>
                             <p className="text-xs text-muted-foreground">
                                 Issues resolved
                             </p>
@@ -231,39 +408,59 @@ export default function SupervisorSupport() {
 
                 {/* Filters */}
                 <div className="flex flex-wrap items-center gap-4">
-                    <div className="relative flex-1 max-w-sm">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <div className="relative max-w-sm flex-1">
+                        <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
-                            placeholder="Search requests..."
+                            placeholder="Search requests by subject..."
                             className="pl-9"
                             value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
+                            onChange={(e) => handleSearch(e.target.value)}
                         />
+                        {searchQuery && (
+                            <button
+                                onClick={() => handleSearch('')}
+                                className="absolute top-1/2 right-3 -translate-y-1/2"
+                            >
+                                <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                            </button>
+                        )}
                     </div>
-                    <Select value={internFilter} onValueChange={setInternFilter}>
-                        <SelectTrigger className="w-[180px]">
-                            <User className="h-4 w-4 mr-2" />
-                            <SelectValue placeholder="Filter by Intern" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Interns</SelectItem>
-                            {interns.map((intern) => (
-                                <SelectItem key={intern} value={intern}>{intern}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+
+                    <Select
+                        options={traineeOptions}
+                        value={internFilter}
+                        onChange={handleInternFilter}
+                        placeholder="Filter by Intern"
+                        isClearable
+                        styles={getSelectStyles(isDarkMode)}
+                        className="text-sm"
+                    />
+
+                    <ShadcnSelect
+                        value={statusFilter}
+                        onValueChange={handleStatusFilter}
+                    >
                         <SelectTrigger className="w-[150px]">
-                            <Filter className="h-4 w-4 mr-2" />
+                            <Filter className="mr-2 h-4 w-4" />
                             <SelectValue placeholder="Status" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Status</SelectItem>
-                            <SelectItem value="Pending">Pending</SelectItem>
+                            <SelectItem value="Submitted">Submitted</SelectItem>
                             <SelectItem value="Replied">Replied</SelectItem>
                             <SelectItem value="Resolved">Resolved</SelectItem>
                         </SelectContent>
-                    </Select>
+                    </ShadcnSelect>
+
+                    {hasActiveFilters && (
+                        <Button
+                            variant="ghost"
+                            onClick={clearFilters}
+                            size="sm"
+                        >
+                            Clear Filters
+                        </Button>
+                    )}
                 </div>
 
                 {/* Request List */}
@@ -271,44 +468,79 @@ export default function SupervisorSupport() {
                     <CardHeader>
                         <CardTitle>Support Request List</CardTitle>
                         <CardDescription>
-                            {filteredRequests.length} request{filteredRequests.length !== 1 ? 's' : ''} found
+                            Showing {requests.from} to {requests.to} of{' '}
+                            {requests.total} requests
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        {filteredRequests.length === 0 ? (
+                        {requests.data.length === 0 ? (
                             <div className="flex h-[200px] items-center justify-center text-muted-foreground">
                                 No support requests found matching your filters.
                             </div>
                         ) : (
                             <div className="space-y-4">
-                                {filteredRequests.map((request) => (
-                                    <div key={request.id} className="rounded-lg border overflow-hidden">
-                                        <div 
-                                            className="p-4 cursor-pointer hover:bg-accent/50 transition-colors"
-                                            onClick={() => toggleExpand(request.id)}
+                                {requests.data.map((request) => (
+                                    <div
+                                        key={request.id}
+                                        className="overflow-hidden rounded-lg border"
+                                    >
+                                        <div
+                                            className="cursor-pointer p-4 transition-colors hover:bg-accent/50"
+                                            onClick={() =>
+                                                toggleExpand(request.id)
+                                            }
                                         >
                                             <div className="flex items-start justify-between">
                                                 <div className="flex-1">
-                                                    <div className="flex items-center gap-2 mb-1">
-                                                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium">
-                                                            {request.intern.charAt(0)}
+                                                    <div className="mb-1 flex items-center gap-2">
+                                                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-medium">
+                                                            {request.user?.name?.charAt(
+                                                                0,
+                                                            ) || 'U'}
                                                         </div>
                                                         <div>
-                                                            <h3 className="font-semibold">{request.title}</h3>
-                                                            <span className="text-sm text-muted-foreground">{request.intern}</span>
+                                                            <h3 className="font-semibold">
+                                                                {
+                                                                    request.subject
+                                                                }
+                                                            </h3>
+                                                            <span className="text-sm text-muted-foreground">
+                                                                {
+                                                                    request.user
+                                                                        ?.name
+                                                                }
+                                                            </span>
                                                         </div>
                                                         <div className="ml-2">
-                                                            {getSupportStatusBadge(request.status)}
+                                                            {getSupportStatusBadge(
+                                                                request.status,
+                                                            )}
                                                         </div>
                                                     </div>
-                                                    <p className="text-sm text-muted-foreground mt-2 ml-10 line-clamp-1">{request.description}</p>
-                                                    <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2 ml-10">
-                                                        <span>Related: {request.relatedTask}</span>
-                                                        <span>Submitted: {request.dateSubmitted}</span>
+                                                    <p className="mt-2 ml-10 line-clamp-1 text-sm text-muted-foreground">
+                                                        {request.description}
+                                                    </p>
+                                                    <div className="mt-2 ml-10 flex items-center gap-4 text-xs text-muted-foreground">
+                                                        <span>
+                                                            Related:{' '}
+                                                            {request.task
+                                                                ?.title ||
+                                                                'No task'}
+                                                        </span>
+                                                        <span>
+                                                            Submitted:{' '}
+                                                            {new Date(
+                                                                request.created_at,
+                                                            ).toLocaleDateString()}
+                                                        </span>
                                                     </div>
                                                 </div>
-                                                <Button variant="ghost" size="icon">
-                                                    {expandedId === request.id ? (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                >
+                                                    {expandedId ===
+                                                    request.id ? (
                                                         <ChevronUp className="h-4 w-4" />
                                                     ) : (
                                                         <ChevronDown className="h-4 w-4" />
@@ -321,55 +553,117 @@ export default function SupervisorSupport() {
                                             <div className="border-t bg-accent/30 p-4">
                                                 <div className="space-y-4">
                                                     <div>
-                                                        <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
+                                                        <h4 className="mb-2 flex items-center gap-2 text-sm font-medium">
                                                             <AlertCircle className="h-4 w-4 text-yellow-500" />
                                                             Intern's Issue:
                                                         </h4>
-                                                        <p className="text-sm bg-white p-3 rounded border">{request.description}</p>
+                                                        <p className="rounded border bg-white p-3 text-sm">
+                                                            {
+                                                                request.description
+                                                            }
+                                                        </p>
                                                     </div>
 
-                                                    {request.supervisorReply && (
+                                                    {request?.response
+                                                        ?.message && (
                                                         <div>
-                                                            <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
+                                                            <h4 className="mb-2 flex items-center gap-2 text-sm font-medium">
                                                                 <MessageSquare className="h-4 w-4 text-blue-500" />
-                                                                Your Reply ({request.replyDate}):
+                                                                Your Reply:
                                                             </h4>
-                                                            <p className="text-sm bg-blue-50 p-3 rounded border border-blue-200">
-                                                                {request.supervisorReply}
+                                                            <p className="rounded border border-blue-200 bg-blue-50 p-3 text-sm">
+                                                                {
+                                                                    request
+                                                                        ?.response
+                                                                        ?.message
+                                                                }
                                                             </p>
                                                         </div>
                                                     )}
 
-                                                    <div className="flex items-center gap-2">
-                                                        {request.status === 'Pending' && (
-                                                            <Button onClick={() => openReplyModal(request)}>
-                                                                <Send className="h-4 w-4 mr-2" />
-                                                                Reply
-                                                            </Button>
-                                                        )}
-                                                        {request.status === 'Replied' && (
-                                                            <>
-                                                                <Button variant="outline" onClick={() => openReplyModal(request)}>
-                                                                    <Send className="h-4 w-4 mr-2" />
-                                                                    Edit Reply
-                                                                </Button>
-                                                                <Button 
-                                                                    variant="outline" 
-                                                                    className="text-green-600 border-green-600 hover:bg-green-50"
-                                                                    onClick={() => markAsResolved(request.id)}
+                                                    {request.status ===
+                                                        'Submitted' && (
+                                                        <div className="space-y-3">
+                                                            <textarea
+                                                                className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                                                placeholder="Type your response to the intern..."
+                                                                value={
+                                                                    activeRequestId ===
+                                                                    request.id
+                                                                        ? replyForm
+                                                                              .data
+                                                                              .reply
+                                                                        : ''
+                                                                }
+                                                                onChange={(e) =>
+                                                                    replyForm.setData(
+                                                                        'reply',
+                                                                        e.target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                            />
+                                                            {replyForm.errors
+                                                                .reply && (
+                                                                <p className="text-sm text-red-500">
+                                                                    {
+                                                                        replyForm
+                                                                            .errors
+                                                                            .reply
+                                                                    }
+                                                                </p>
+                                                            )}
+                                                            <div className="flex items-center gap-2">
+                                                                <Button
+                                                                    onClick={() =>
+                                                                        handleSendReply(
+                                                                            request.id,
+                                                                        )
+                                                                    }
+                                                                    disabled={
+                                                                        !replyForm.data.reply?.trim() ||
+                                                                        replyForm.processing
+                                                                    }
                                                                 >
-                                                                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                                                                    Mark as Resolved
+                                                                    <Send className="mr-2 h-4 w-4" />
+                                                                    {replyForm.processing
+                                                                        ? 'Sending...'
+                                                                        : 'Send Reply'}
                                                                 </Button>
-                                                            </>
-                                                        )}
-                                                        {request.status === 'Resolved' && (
-                                                            <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 p-3 rounded">
-                                                                <CheckCircle2 className="h-4 w-4" />
-                                                                This issue has been resolved.
                                                             </div>
-                                                        )}
-                                                    </div>
+                                                        </div>
+                                                    )}
+                                                    {request.status ===
+                                                        'Replied' && (
+                                                            <div className='flex justify-end'>
+                                                                <Button
+                                                                    variant="secondary"
+                                                                    className="border-green-600 text-green-600 hover:bg-green-50 cursor-pointer"
+                                                                    onClick={() =>
+                                                                        handleMarkAsResolved(
+                                                                            request.id,
+                                                                        )
+                                                                    }
+                                                                    disabled={
+                                                                        resolveForm.processing
+                                                                    }
+                                                                >
+                                                                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                                                                    {resolveForm.processing
+                                                                        ? 'Processing...'
+                                                                        : 'Mark as Resolved'}
+                                                                </Button>
+                                                            </div>
+                                                    )}
+
+                                                    {request.status ===
+                                                        'Resolved' && (
+                                                        <div className="flex items-center gap-2 rounded bg-green-50 p-3 text-sm text-green-600">
+                                                            <CheckCircle2 className="h-4 w-4" />
+                                                            This issue has been
+                                                            resolved.
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         )}
@@ -378,48 +672,18 @@ export default function SupervisorSupport() {
                             </div>
                         )}
                     </CardContent>
-                </Card>
 
-                {/* Reply Modal */}
-                <Dialog open={isReplyModalOpen} onOpenChange={setIsReplyModalOpen}>
-                    <DialogContent className="max-w-lg">
-                        <DialogHeader>
-                            <DialogTitle>Reply to Support Request</DialogTitle>
-                            <DialogDescription>
-                                Respond to {selectedRequest?.intern}'s request
-                            </DialogDescription>
-                        </DialogHeader>
-                        {selectedRequest && (
-                            <div className="space-y-4 py-4">
-                                <div>
-                                    <Label className="text-sm text-muted-foreground">Issue:</Label>
-                                    <p className="mt-1 text-sm p-3 bg-accent rounded">{selectedRequest.title}</p>
-                                </div>
-                                <div>
-                                    <Label className="text-sm text-muted-foreground">Details:</Label>
-                                    <p className="mt-1 text-sm p-3 bg-accent rounded">{selectedRequest.description}</p>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="reply">Your Reply</Label>
-                                    <textarea
-                                        id="reply"
-                                        className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                        placeholder="Type your response to the intern..."
-                                        value={replyText}
-                                        onChange={(e) => setReplyText(e.target.value)}
-                                    />
-                                </div>
-                            </div>
-                        )}
-                        <DialogFooter>
-                            <Button variant="outline" onClick={() => setIsReplyModalOpen(false)}>Cancel</Button>
-                            <Button onClick={handleSendReply} disabled={!replyText.trim()}>
-                                <Send className="h-4 w-4 mr-2" />
-                                Send Reply
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
+                    {/* Pagination */}
+                    {requests.last_page > 1 && (
+                        <CardContent className="border-t px-6 py-4">
+                            <PaginationPrevNext
+                                links={requests.links}
+                                current_page={requests.current_page}
+                                last_page={requests.last_page}
+                            />
+                        </CardContent>
+                    )}
+                </Card>
             </div>
         </AppLayout>
     );

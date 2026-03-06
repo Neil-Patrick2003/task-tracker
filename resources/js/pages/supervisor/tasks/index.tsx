@@ -271,7 +271,6 @@ export default function SupervisorTasks({
                     </p>
                 </div>
 
-                {/* Stats - Using backend data */}
                 <div className="grid gap-4 md:grid-cols-4">
                     <Card>
                         <CardContent className="pt-6">

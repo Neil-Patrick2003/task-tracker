@@ -79,7 +79,6 @@ class SupportController extends Controller
             'status' => 'Submitted',
             'task_id' => $request->task_id,
             'ojt_id' => Auth::id(),
-
         ]);
 
         return redirect()->back()->with('success', 'Your support request has been submitted.');
