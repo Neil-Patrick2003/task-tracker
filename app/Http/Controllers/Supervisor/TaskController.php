@@ -25,7 +25,7 @@ class TaskController extends Controller
         $with_challenges = Task::whereHas('challenges')->count();
 
 
-        $trainees = User::where('role', 'Trainee')->get();
+        $trainees = User::where('role', 'Intern')->get();
 
         $tasks = QueryBuilder::for(Task::class)
             ->with(['challenges', 'requests', 'ojt'])
