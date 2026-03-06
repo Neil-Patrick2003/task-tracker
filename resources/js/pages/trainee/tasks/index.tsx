@@ -88,18 +88,11 @@ const getStatusBadge = (status: string) => {
                     Completed
                 </Badge>
             );
-        case 'Ongoing':
+        case 'In Progress':
             return (
                 <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
                     <Loader2 className="mr-1 h-3 w-3" />
-                    Ongoing
-                </Badge>
-            );
-        case 'Pending':
-            return (
-                <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
-                    <Loader2 className="mr-1 h-3 w-3" />
-                    Pending
+                    In Progress
                 </Badge>
             );
         default:
@@ -331,8 +324,9 @@ export default function Tasks({ tasks, query = {}, total_tasks, total_hours, com
                         <SelectContent>
                             <SelectItem value="all">All Status</SelectItem>
                             <SelectItem value="Completed">Completed</SelectItem>
-                            <SelectItem value="Ongoing">Ongoing</SelectItem>
-                            <SelectItem value="Pending">Pending</SelectItem>
+                            <SelectItem value="In Progress">
+                                In Progress
+                            </SelectItem>
                         </SelectContent>
                     </Select>
 

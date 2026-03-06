@@ -69,7 +69,7 @@ class TaskController extends Controller
             'title' => 'required|string|max:255',
             'description' => 'required|string|max:1000',
             'hoursRendered' => 'required|integer|min:0|max:24',
-            'status' => 'required|string|in:Ongoing,Completed,Pending,Blocked',
+            'status' => 'required|string|in:In Progress,Completed   ',
             'challengesEncountered' => 'nullable|string|max:1000',
             'supportNeeded' => 'nullable|boolean',
             'supportSubject' => 'required_if:supportNeeded,true|string|max:255|nullable',
